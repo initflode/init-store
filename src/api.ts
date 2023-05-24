@@ -1,18 +1,18 @@
 import "isomorphic-unfetch";
+import { URLSearchParams } from "url";
 import _ from "lodash";
-import * as QueryString from "query-string";
+import { API_BASE_MAINNET, API_BASE_TESTNET, API_PATH } from "./constants";
 import {
-  API_BASE_MAINNET,
-  API_BASE_TESTNET,
-  API_PATH,
-  ORDERBOOK_PATH,
-} from "./constants";
-import {
+  BuildOfferResponse,
+  FulfillmentDataResponse,
+  GetCollectionResponse,
   OrderAPIOptions,
+  OrderSide,
   OrdersPostQueryResponse,
   OrdersQueryOptions,
   OrdersQueryResponse,
   OrderV2,
+  PostOfferResponse,
   ProtocolData,
   QueryCursors,
 } from "./orders/types";
@@ -20,6 +20,14 @@ import {
   serializeOrdersQueryOptions,
   getOrdersAPIPath,
   deserializeOrder,
+  getFulfillmentDataPath,
+  getFulfillListingPayload,
+  getFulfillOfferPayload,
+  getBuildOfferPath,
+  getBuildCollectionOfferPayload,
+  getCollectionPath,
+  getPostCollectionOfferPath,
+  getPostCollectionOfferPayload,
 } from "./orders/utils";
 import {
   Network,
@@ -28,6 +36,7 @@ import {
   OpenSeaAssetBundle,
   OpenSeaAssetBundleQuery,
   OpenSeaAssetQuery,
+  OpenSeaCollection,
   OpenSeaFungibleToken,
   OpenSeaFungibleTokenQuery,
 } from "./types";
@@ -36,6 +45,7 @@ import {
   assetFromJSON,
   delay,
   tokenFromJSON,
+  collectionFromJSON,
 } from "./utils/utils";
 
 export class OpenSeaAPI {
@@ -135,6 +145,38 @@ export class OpenSeaAPI {
   }
 
   /**
+   * Generate the data needed to fulfill a listing or an offer
+   */
+  public async generateFulfillmentData(
+    fulfillerAddress: string,
+    orderHash: string,
+    protocolAddress: string,
+    side: OrderSide
+  ): Promise<FulfillmentDataResponse> {
+    let payload: object | null = null;
+    if (side === "ask") {
+      payload = getFulfillListingPayload(
+        fulfillerAddress,
+        orderHash,
+        protocolAddress,
+        this.networkName
+      );
+    } else {
+      payload = getFulfillOfferPayload(
+        fulfillerAddress,
+        orderHash,
+        protocolAddress,
+        this.networkName
+      );
+    }
+    const response = await this.post<FulfillmentDataResponse>(
+      getFulfillmentDataPath(side),
+      payload
+    );
+    return response;
+  }
+
+  /**
    * Send an order to be posted. Throws when the order is invalid.
    */
   public async postOrder(
@@ -144,11 +186,11 @@ export class OpenSeaAPI {
   ): Promise<OrderV2> {
     let response: OrdersPostQueryResponse;
     // TODO: Validate apiOptions. Avoid API calls that will definitely fail
-    const { protocol = "seaport", side } = apiOptions;
+    const { protocol = "seaport", side, protocolAddress } = apiOptions;
     try {
       response = await this.post<OrdersPostQueryResponse>(
         getOrdersAPIPath(this.networkName, protocol, side),
-        order
+        { ...order, protocol_address: protocolAddress }
       );
     } catch (error) {
       _throwOrContinue(error, retries);
@@ -156,6 +198,49 @@ export class OpenSeaAPI {
       return this.postOrder(order, apiOptions, { retries: retries - 1 });
     }
     return deserializeOrder(response.order);
+  }
+
+  /**
+   * Build an offer
+   */
+  public async buildOffer(
+    offererAddress: string,
+    quantity: number,
+    collectionSlug: string
+  ): Promise<BuildOfferResponse> {
+    const payload = getBuildCollectionOfferPayload(
+      offererAddress,
+      quantity,
+      collectionSlug
+    );
+    const response = await this.post<BuildOfferResponse>(
+      getBuildOfferPath(),
+      payload
+    );
+    return response;
+  }
+
+  /**
+   * Post collection offer
+   */
+  public async postCollectionOffer(
+    order: ProtocolData,
+    slug: string,
+    retries = 0
+  ): Promise<PostOfferResponse | null> {
+    const payload = getPostCollectionOfferPayload(slug, order);
+    console.log("Post Order Payload");
+    console.log(JSON.stringify(payload, null, 4));
+    try {
+      return await this.post<PostOfferResponse>(
+        getPostCollectionOfferPath(),
+        payload
+      );
+    } catch (error) {
+      _throwOrContinue(error, retries);
+      await delay(1000);
+      return this.postCollectionOffer(order, slug, retries - 1);
+    }
   }
 
   /**
@@ -180,22 +265,6 @@ export class OpenSeaAPI {
     );
 
     return !!json.success;
-  }
-
-  /**
-   * Get which version of Wyvern exchange to use to create orders
-   * Simply return null in case API doesn't give us a good response
-   */
-  public async getOrderCreateWyvernExchangeAddress(): Promise<string | null> {
-    try {
-      const result = await this.get(`${ORDERBOOK_PATH}/exchange/`);
-      return result as string;
-    } catch (error) {
-      this.logger(
-        "Couldn't retrieve Wyvern exchange address for order creation"
-      );
-      return null;
-    }
   }
 
   /**
@@ -254,6 +323,15 @@ export class OpenSeaAPI {
       previous: json.previous,
       estimatedCount: json.estimated_count,
     };
+  }
+
+  /**
+   * Fetch a collection through the API
+   */
+  public async getCollection(slug: string): Promise<OpenSeaCollection> {
+    const path = getCollectionPath(slug);
+    const response = await this.get<GetCollectionResponse>(path);
+    return collectionFromJSON(response.collection);
   }
 
   /**
@@ -331,8 +409,9 @@ export class OpenSeaAPI {
    * @param query Data to send. Will be stringified using QueryString
    */
   public async get<T>(apiPath: string, query: object = {}): Promise<T> {
-    const qs = QueryString.stringify(query);
+    const qs = this.objectToSearchParams(query);
     const url = `${apiPath}?${qs}`;
+    console.log(url);
 
     const response = await this._fetch(url);
     return response.json();
@@ -378,6 +457,20 @@ export class OpenSeaAPI {
     });
   }
 
+  private objectToSearchParams(params: object = {}) {
+    const urlSearchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value && Array.isArray(value)) {
+        value.forEach((item) => item && urlSearchParams.append(key, item));
+      } else if (value) {
+        urlSearchParams.append(key, value);
+      }
+    });
+
+    return urlSearchParams.toString();
+  }
+
   /**
    * Get from an API Endpoint, sending auth token in headers
    * @param apiPath Path to URL endpoint under API
@@ -391,6 +484,7 @@ export class OpenSeaAPI {
       ...opts,
       headers: {
         ...(apiKey ? { "X-API-KEY": apiKey } : {}),
+        "x-app-id": "opensea-js",
         ...(opts.headers || {}),
       },
     };

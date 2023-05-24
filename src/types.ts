@@ -1,18 +1,7 @@
 /* eslint-disable import/no-unused-modules */
 import BigNumber from "bignumber.js";
 import { AbiItem } from "web3-utils";
-import {
-  ECSignature,
-  HowToCall,
-  Network,
-  Order as WyvernOrder,
-  WyvernProtocolConfig,
-} from "wyvern-js/lib/types";
-import type { Token } from "wyvern-schemas/dist/types";
 import type { OrderV2 } from "./orders/types";
-
-export { HowToCall, Network };
-export type { ECSignature };
 
 /**
  * Events emitted by the SDK. There are five types:
@@ -106,12 +95,25 @@ export interface OpenSeaAPIConfig {
   wyvernConfig?: WyvernConfig;
 }
 
-export type WyvernConfig = WyvernProtocolConfig & {
+export enum Network {
+  Main = "main",
+  Goerli = "goerli",
+  Rinkeby = "rinkeby",
+}
+
+export type WyvernConfig = {
+  network: Network;
+  gasPrice?: BigNumber;
+  wyvernExchangeContractAddress?: string;
+  wyvernProxyRegistryContractAddress?: string;
+  wyvernDAOContractAddress?: string;
+  wyvernTokenContractAddress?: string;
+  wyvernAtomicizerContractAddress?: string;
   wyvernTokenTransferProxyContractAddress?: string;
 };
 
 /**
- * Wyvern order side: buy or sell.
+ * Seaport order side: buy or sell.
  */
 export enum OrderSide {
   Buy = 0,
@@ -179,6 +181,22 @@ export enum TokenStandardVersion {
   ERC721v1 = "1.0",
   ERC721v2 = "2.0",
   ERC721v3 = "3.0",
+}
+
+/**
+ * The collection's approval status within OpenSea.
+ * Can be not_requested (brand new collections)
+ * requested (collections that requested safelisting on our site)
+ * approved (collections that are approved on our site and can be found in search results)
+ * verified (verified collections)
+ */
+
+export enum SafelistStatus {
+  NOT_REQUESTED = "not_requested",
+  REQUESTED = "requested",
+  APPROVED = "approved",
+  VERIFIED = "verified",
+  DISABLED_TOP_TRENDING = "disabled_top_trending",
 }
 
 // Collection fees mapping recipient address to basis points
@@ -302,6 +320,91 @@ interface NumericalTraitStats {
 interface StringTraitStats {
   [key: string]: number;
 }
+/**
+ * Annotated collection stats with OpenSea
+ */
+export interface OpenSeaCollectionStats {
+  // One Minute
+  one_minute_volume: number;
+  one_minute_change: number;
+  one_minute_difference: number;
+  one_minute_sales: number;
+  one_minute_sales_change: number;
+  one_minute_average_price: number;
+
+  // Five Minute
+  five_minute_volume: number;
+  five_minute_change: number;
+  five_minute_difference: number;
+  five_minute_sales: number;
+  five_minute_sales_change: number;
+  five_minute_average_price: number;
+
+  // Fifteen Minute
+  fifteen_minute_volume: number;
+  fifteen_minute_change: number;
+  fifteen_minute_difference: number;
+  fifteen_minute_sales: number;
+  fifteen_minute_sales_change: number;
+  fifteen_minute_average_price: number;
+
+  // Thirty Minute
+  thirty_minute_volume: number;
+  thirty_minute_change: number;
+  thirty_minute_difference: number;
+  thirty_minute_sales: number;
+  thirty_minute_sales_change: number;
+  thirty_minute_average_price: number;
+
+  // One Hour
+  one_hour_volume: number;
+  one_hour_change: number;
+  one_hour_sales: number;
+  one_hour_sales_change: number;
+  one_hour_average_price: number;
+  one_hour_difference: number;
+
+  // Six Hour
+  six_hour_volume: number;
+  six_hour_change: number;
+  six_hour_sales: number;
+  six_hour_sales_change: number;
+  six_hour_average_price: number;
+  six_hour_difference: number;
+
+  // One Day
+  one_day_volume: number;
+  one_day_change: number;
+  one_day_sales: number;
+  one_day_sales_change: number;
+  one_day_average_price: number;
+  one_day_difference: number;
+
+  // Seven Day
+  seven_day_volume: number;
+  seven_day_change: number;
+  seven_day_sales: number;
+  seven_day_average_price: number;
+  seven_day_difference: number;
+
+  // Thirty Day
+  thirty_day_volume: number;
+  thirty_day_change: number;
+  thirty_day_sales: number;
+  thirty_day_average_price: number;
+  thirty_day_difference: number;
+
+  // Total
+  total_volume: number;
+  total_sales: number;
+  total_supply: number;
+  count: number;
+  num_owners: number;
+  average_price: number;
+  num_reports: number;
+  market_cap: number;
+  floor_price: number;
+}
 
 /**
  * Annotated collection with OpenSea metadata
@@ -329,9 +432,11 @@ export interface OpenSeaCollection extends OpenSeaFees {
   // Image for the collection when featured
   featuredImageUrl: string;
   // Object with stats about the collection
-  stats: object;
+  stats: OpenSeaCollectionStats;
   // Data about displaying cards
   displayData: object;
+  // The collection's approval status
+  safelistRequestStatus: SafelistStatus;
   // Tokens allowed for this collection
   paymentTokens: OpenSeaFungibleToken[];
   // Address for dev fee payouts
@@ -343,7 +448,7 @@ export interface OpenSeaCollection extends OpenSeaFees {
   // Link to the collection's wiki, if available
   wikiLink?: string;
   // Map of collection fees holding OpenSea and seller fees
-  fees?: Fees | null;
+  fees: Fees;
 }
 
 export interface OpenSeaTraitStats {
@@ -380,6 +485,10 @@ export interface OpenSeaAsset extends Asset {
   imageUrlOriginal: string;
   // Thumbnail url for this token
   imageUrlThumbnail: string;
+  // The animation url for this token, if it exists
+  animationUrl: string | null;
+  // The original animation url for this token, if it exists
+  animationUrlOriginal: string | null;
   // Link to token on OpenSea
   openseaLink: string;
   // Link to token on dapp's site
@@ -392,10 +501,6 @@ export interface OpenSeaAsset extends Asset {
   lastSale: AssetEvent | null;
   // The suggested background color for the image url
   backgroundColor: string | null;
-  // The per-transfer fee, in base units, for this asset in its transfer method
-  transferFee: BigNumber | string | null;
-  // The transfer fee token for this asset in its transfer method
-  transferFeePaymentToken: OpenSeaFungibleToken | null;
 }
 
 /**
@@ -482,7 +587,11 @@ export interface Transaction {
 /**
  * Full annotated Fungible Token spec with OpenSea metadata
  */
-export interface OpenSeaFungibleToken extends Token {
+export interface OpenSeaFungibleToken {
+  name: string;
+  symbol: string;
+  decimals: number;
+  address: string;
   imageUrl?: string;
   ethPrice?: string;
   usdPrice?: string;
@@ -551,14 +660,6 @@ export interface ComputedFees extends OpenSeaFees {
   // Total fees. dev + opensea
   totalBuyerFeeBasisPoints: number;
   totalSellerFeeBasisPoints: number;
-
-  // Fees that the item's creator takes on every transfer
-  transferFee: BigNumber;
-  transferFeeTokenAddress: string | null;
-
-  // Fees that go to whoever refers the order to the taker.
-  // Comes out of OpenSea fees
-  sellerBountyBasisPoints: number;
 }
 
 interface ExchangeMetadataForAsset {
@@ -576,7 +677,27 @@ export type ExchangeMetadata =
   | ExchangeMetadataForAsset
   | ExchangeMetadataForBundle;
 
-export interface UnhashedOrder extends WyvernOrder {
+export interface UnhashedOrder {
+  exchange: string;
+  maker: string;
+  taker: string;
+  makerRelayerFee: BigNumber;
+  takerRelayerFee: BigNumber;
+  makerProtocolFee: BigNumber;
+  takerProtocolFee: BigNumber;
+  feeRecipient: string;
+  target: string;
+  calldata: string;
+  replacementPattern: string;
+  staticTarget: string;
+  staticExtradata: string;
+  paymentToken: string;
+  basePrice: BigNumber;
+  extra: BigNumber;
+  listingTime: BigNumber;
+  expirationTime: BigNumber;
+  salt: BigNumber;
+
   feeMethod: FeeMethod;
   side: OrderSide;
   saleKind: SaleKind;
@@ -591,8 +712,21 @@ export interface UnhashedOrder extends WyvernOrder {
   metadata: ExchangeMetadata;
 }
 
+export enum HowToCall {
+  Call = 0,
+  DelegateCall = 1,
+  StaticCall = 2,
+  Create = 3,
+}
+
 export interface UnsignedOrder extends UnhashedOrder {
   hash?: string;
+}
+
+export interface ECSignature {
+  v: number;
+  r: string;
+  s: string;
 }
 
 /**
@@ -731,3 +865,67 @@ export type Web3Callback<T> = (err: Error | null, result: T) => void;
 export type TxnCallback = (result: boolean) => void;
 
 export type PartialReadonlyContractAbi = AbiItem[];
+
+// Types extracted from wyvern-js: https://github.com/ProjectOpenSea/wyvern-js#7429b1f2dd123f012cae1f3144a069e91ecd0682
+export interface AnnotatedFunctionABI {
+  type: AbiType;
+  name: string;
+  target: string;
+  inputs: AnnotatedFunctionInput[];
+  outputs: AnnotatedFunctionOutput[];
+  constant: boolean;
+  stateMutability: StateMutability;
+  payable: boolean;
+}
+
+export enum AbiType {
+  Function = "function",
+  Constructor = "constructor",
+  Event = "event",
+  Fallback = "fallback",
+}
+
+export interface AnnotatedFunctionInput {
+  name: string;
+  type: string;
+  kind: FunctionInputKind;
+  value?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+export interface AnnotatedFunctionOutput {
+  name: string;
+  type: string;
+  kind: FunctionOutputKind;
+}
+
+export enum FunctionInputKind {
+  Replaceable = "replaceable",
+  Asset = "asset",
+  Owner = "owner",
+  Index = "index",
+  Count = "count",
+  Data = "data",
+}
+
+export enum FunctionOutputKind {
+  Owner = "owner",
+  Asset = "asset",
+  Count = "count",
+  Other = "other",
+}
+
+export enum StateMutability {
+  Pure = "pure",
+  View = "view",
+  Payable = "payable",
+  Nonpayable = "nonpayable",
+}
+
+export enum SolidityTypes {
+  Address = "address",
+  Uint256 = "uint256",
+  Uint8 = "uint8",
+  Uint = "uint",
+  Bytes = "bytes",
+  String = "string",
+}

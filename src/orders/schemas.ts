@@ -1,10 +1,10 @@
 import Ajv, { JSONSchemaType, ValidateFunction } from "ajv";
+import { OrderFee, OrderV2 } from "./types";
 import {
   accountSchema,
   assetBundleSchema,
   PartialAssetBundleType,
 } from "../schemas";
-import { OrderFee, OrderV2 } from "./types";
 
 const ajv = new Ajv();
 
@@ -69,7 +69,6 @@ const orderSchema: JSONSchemaType<PartialOrderV2Type> = {
     "cancelled",
     "finalized",
     "markedInvalid",
-    "clientSignature",
     "makerAssetBundle",
     "takerAssetBundle",
   ],

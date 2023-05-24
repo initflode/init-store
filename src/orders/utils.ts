@@ -1,18 +1,23 @@
-import { Network } from "../types";
-import { accountFromJSON, assetBundleFromJSON } from "../utils";
+import { CROSS_CHAIN_SEAPORT_V1_5_ADDRESS } from "@opensea/seaport-js/lib/constants";
 import {
   OrderProtocol,
   OrdersQueryOptions,
   OrderSide,
   OrderV2,
   SerializedOrderV2,
+  ProtocolData,
 } from "./types";
+import { Network } from "../types";
+import { accountFromJSON, assetBundleFromJSON } from "../utils";
 
 const NETWORK_TO_CHAIN = {
   [Network.Main]: "ethereum",
   [Network.Rinkeby]: "rinkeby",
   [Network.Goerli]: "goerli",
 };
+
+export const DEFAULT_SEAPORT_CONTRACT_ADDRESS =
+  CROSS_CHAIN_SEAPORT_V1_5_ADDRESS;
 
 export const getOrdersAPIPath = (
   network: Network,
@@ -22,6 +27,91 @@ export const getOrdersAPIPath = (
   const chain = NETWORK_TO_CHAIN[network];
   const sidePath = side === "ask" ? "listings" : "offers";
   return `/v2/orders/${chain}/${protocol}/${sidePath}`;
+};
+
+export const getCollectionPath = (slug: string) => {
+  return `/api/v1/collection/${slug}`;
+};
+
+export const getBuildOfferPath = () => {
+  return `/v2/offers/build`;
+};
+
+export const getPostCollectionOfferPath = () => {
+  return `/v2/offers`;
+};
+
+export const getPostCollectionOfferPayload = (
+  collectionSlug: string,
+  protocol_data: ProtocolData
+) => {
+  return {
+    criteria: {
+      collection: { slug: collectionSlug },
+    },
+    protocol_data,
+    protocol_address: DEFAULT_SEAPORT_CONTRACT_ADDRESS,
+  };
+};
+
+export const getBuildCollectionOfferPayload = (
+  offererAddress: string,
+  quantity: number,
+  collectionSlug: string
+) => {
+  return {
+    offerer: offererAddress,
+    quantity,
+    criteria: {
+      collection: {
+        slug: collectionSlug,
+      },
+    },
+    protocol_address: DEFAULT_SEAPORT_CONTRACT_ADDRESS,
+  };
+};
+
+export const getFulfillmentDataPath = (side: OrderSide) => {
+  const sidePath = side === "ask" ? "listings" : "offers";
+  return `/v2/${sidePath}/fulfillment_data`;
+};
+
+export const getFulfillListingPayload = (
+  fulfillerAddress: string,
+  order_hash: string,
+  protocolAddress: string,
+  network: Network
+) => {
+  const chain = NETWORK_TO_CHAIN[network];
+  return {
+    listing: {
+      hash: order_hash,
+      chain,
+      protocol_address: protocolAddress,
+    },
+    fulfiller: {
+      address: fulfillerAddress,
+    },
+  };
+};
+
+export const getFulfillOfferPayload = (
+  fulfillerAddress: string,
+  order_hash: string,
+  protocolAddress: string,
+  network: Network
+) => {
+  const chain = NETWORK_TO_CHAIN[network];
+  return {
+    offer: {
+      hash: order_hash,
+      chain,
+      protocol_address: protocolAddress,
+    },
+    fulfiller: {
+      address: fulfillerAddress,
+    },
+  };
 };
 
 type OrdersQueryPathOptions = "protocol" | "side";

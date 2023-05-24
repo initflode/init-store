@@ -1,16 +1,13 @@
-import { WyvernProtocol } from "wyvern-js";
+import BigNumber from "bignumber.js";
 import { Network } from "./types";
 
 export const DEFAULT_GAS_INCREASE_FACTOR = 1.01;
-export const NULL_ADDRESS = WyvernProtocol.NULL_ADDRESS;
+export const NULL_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const NULL_BLOCK_HASH =
   "0x0000000000000000000000000000000000000000000000000000000000000000";
 export const OPENSEA_LEGACY_FEE_RECIPIENT =
   "0x5b3256965e7c3cf26e11fcaf296dfc8807c01073";
-export const OPENSEA_FEE_RECIPIENT =
-  "0x0000a26b00c1f0df003000390027140000faa719";
 export const INVERSE_BASIS_POINT = 10_000; // 100 basis points per 1%
-export const MAX_UINT_256 = WyvernProtocol.MAX_UINT_256;
 export const SHARED_STOREFRONT_LAZY_MINT_ADAPTER_ADDRESS =
   "0xa604060890923ff400e8c6f5290461a83aedacec"; // Same address on mainnet and Rinkeby
 export const SHARED_STORE_FRONT_ADDRESS_MAINNET =
@@ -20,11 +17,7 @@ export const SHARED_STORE_FRONT_ADDRESS_RINKEBY =
 export const ENJIN_COIN_ADDRESS = "0xf629cbd94d3791c9250152bd8dfbdf380e2a3b9c";
 export const MANA_ADDRESS = "0x0f5d2fb29fb7d3cfee444a200298f468908cc942";
 export const ENJIN_ADDRESS = "0xfaaFDc07907ff5120a76b34b731b278c38d6043C";
-export const ENJIN_LEGACY_ADDRESS =
-  "0x8562c38485B1E8cCd82E44F89823dA76C98eb0Ab";
 export const CK_ADDRESS = "0x06012c8cf97bead5deae237070f9587f8e7a266d";
-export const TESTNET_ASSET_ADDRESS =
-  "0x57b470074beb3c60f0cf94f8aafb3fd6342adccd";
 export const WRAPPED_NFT_FACTORY_ADDRESS_MAINNET =
   "0xf11b5815b143472b7f7c52af0bfa6c6a2c8f40e1";
 export const WRAPPED_NFT_FACTORY_ADDRESS_RINKEBY =
@@ -38,59 +31,17 @@ export const UNISWAP_FACTORY_ADDRESS_MAINNET =
 export const UNISWAP_FACTORY_ADDRESS_RINKEBY =
   "0xf5D915570BC477f9B8D6C0E980aA81757A3AaC36";
 export const DEFAULT_WRAPPED_NFT_LIQUIDATION_UNISWAP_SLIPPAGE_IN_BASIS_POINTS = 1000;
-export const DEFAULT_BUYER_FEE_BASIS_POINTS = 0;
-export const DEFAULT_SELLER_FEE_BASIS_POINTS = 250;
-export const OPENSEA_SELLER_BOUNTY_BASIS_POINTS = 100;
-export const DEFAULT_MAX_BOUNTY = DEFAULT_SELLER_FEE_BASIS_POINTS;
 export const MIN_EXPIRATION_MINUTES = 15;
-export const MAX_EXPIRATION_MONTHS = 3;
+export const MAX_EXPIRATION_MONTHS = 1;
 export const ORDER_MATCHING_LATENCY_SECONDS = 60 * 60 * 24 * 7;
 const ORDERBOOK_VERSION = 1 as number;
 export const API_BASE_MAINNET = "https://api.opensea.io";
 export const API_BASE_TESTNET = "https://testnets-api.opensea.io";
 export const RPC_URL_PATH = "jsonrpc/v1/";
 export const MAINNET_PROVIDER_URL = `${API_BASE_MAINNET}/${RPC_URL_PATH}`;
-export const TESTNET_PROVIDER_URL = `${API_BASE_TESTNET}/${RPC_URL_PATH}`;
-export const ORDERBOOK_PATH = `/wyvern/v${ORDERBOOK_VERSION}`;
 export const API_PATH = `/api/v${ORDERBOOK_VERSION}`;
+export const MAX_UINT_256 = new BigNumber(2).pow(256).minus(1);
 
-export const EIP_712_ORDER_TYPES = {
-  EIP712Domain: [
-    { name: "name", type: "string" },
-    { name: "version", type: "string" },
-    { name: "chainId", type: "uint256" },
-    { name: "verifyingContract", type: "address" },
-  ],
-  Order: [
-    { name: "exchange", type: "address" },
-    { name: "maker", type: "address" },
-    { name: "taker", type: "address" },
-    { name: "makerRelayerFee", type: "uint256" },
-    { name: "takerRelayerFee", type: "uint256" },
-    { name: "makerProtocolFee", type: "uint256" },
-    { name: "takerProtocolFee", type: "uint256" },
-    { name: "feeRecipient", type: "address" },
-    { name: "feeMethod", type: "uint8" },
-    { name: "side", type: "uint8" },
-    { name: "saleKind", type: "uint8" },
-    { name: "target", type: "address" },
-    { name: "howToCall", type: "uint8" },
-    { name: "calldata", type: "bytes" },
-    { name: "replacementPattern", type: "bytes" },
-    { name: "staticTarget", type: "address" },
-    { name: "staticExtradata", type: "bytes" },
-    { name: "paymentToken", type: "address" },
-    { name: "basePrice", type: "uint256" },
-    { name: "extra", type: "uint256" },
-    { name: "listingTime", type: "uint256" },
-    { name: "expirationTime", type: "uint256" },
-    { name: "salt", type: "uint256" },
-    { name: "nonce", type: "uint256" },
-  ],
-};
-
-export const EIP_712_WYVERN_DOMAIN_NAME = "Wyvern Exchange Contract";
-export const EIP_712_WYVERN_DOMAIN_VERSION = "2.3";
 export const MERKLE_VALIDATOR_MAINNET =
   "0xbaf2127b49fc93cbca6269fade0f7f31df4c88a7";
 export const MERKLE_VALIDATOR_RINKEBY =
@@ -112,7 +63,7 @@ export const WETH_ADDRESS_BY_NETWORK = {
 } as const;
 
 export const DEFAULT_ZONE_BY_NETWORK = {
-  [Network.Main]: "0x004c00500000ad104d7dbd00e3ae0a5c00560c00",
-  [Network.Rinkeby]: "0x00000000e88fe2628ebc5da81d2b3cead633e89e",
+  [Network.Main]: "0x0000000000000000000000000000000000000000",
+  [Network.Rinkeby]: "0x0000000000000000000000000000000000000000",
   [Network.Goerli]: "0x0000000000000000000000000000000000000000",
 } as const;

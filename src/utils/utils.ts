@@ -1,21 +1,20 @@
-import { ItemType } from "@opensea/seaport-js/lib/constants";
+import {
+  CROSS_CHAIN_SEAPORT_V1_5_ADDRESS,
+  ItemType,
+} from "@opensea/seaport-js/lib/constants";
 import BigNumber from "bignumber.js";
-import { AbiType, CallData, TxData } from "ethereum-types";
+import BN from "bn.js";
+import { CallData, TxData } from "ethereum-types";
+import * as ethABI from "ethereumjs-abi";
 import * as ethUtil from "ethereumjs-util";
 import * as _ from "lodash";
+import { Buffer } from "safe-buffer";
 import Web3 from "web3";
-import { JsonRpcResponse } from "web3-core-helpers/types";
 import { AbstractProvider } from "web3-core/types";
+import { JsonRpcResponse } from "web3-core-helpers/types";
 import { Contract } from "web3-eth-contract";
-import { WyvernProtocol } from "wyvern-js";
-import {
-  AnnotatedFunctionABI,
-  FunctionInputKind,
-  FunctionOutputKind,
-  Network,
-  Schema,
-  StateMutability,
-} from "wyvern-schemas/dist/types";
+import { assert } from "./assert";
+import { Schema } from "./schemas/schema";
 import {
   ENJIN_ADDRESS,
   ENJIN_COIN_ADDRESS,
@@ -32,9 +31,14 @@ import {
 import { ERC1155 } from "../contracts";
 import { ERC1155Abi } from "../typechain/contracts/ERC1155Abi";
 import {
+  AbiType,
+  AnnotatedFunctionABI,
   Asset,
   AssetEvent,
   ECSignature,
+  FunctionInputKind,
+  FunctionOutputKind,
+  Network,
   OpenSeaAccount,
   OpenSeaAsset,
   OpenSeaAssetBundle,
@@ -47,6 +51,8 @@ import {
   OrderJSON,
   OrderSide,
   SaleKind,
+  SolidityTypes,
+  StateMutability,
   Transaction,
   TxnCallback,
   UnhashedOrder,
@@ -58,8 +64,6 @@ import {
   WyvernNFTAsset,
   WyvernSchemaName,
 } from "../types";
-
-export { WyvernProtocol };
 
 export const annotateERC721TransferABI = (
   asset: WyvernNFTAsset
@@ -234,6 +238,9 @@ export const assetFromJSON = (asset: any): OpenSeaAsset => {
     imageUrlOriginal: asset.image_original_url,
     imageUrlThumbnail: asset.image_thumbnail_url,
 
+    animationUrl: asset.animation_url,
+    animationUrlOriginal: asset.animation_original_url,
+
     externalLink: asset.external_link,
     openseaLink: asset.permalink,
     traits: asset.traits,
@@ -241,11 +248,6 @@ export const assetFromJSON = (asset: any): OpenSeaAsset => {
     lastSale: asset.last_sale ? assetEventFromJSON(asset.last_sale) : null,
     backgroundColor: asset.background_color
       ? `#${asset.background_color}`
-      : null,
-
-    transferFee: asset.transfer_fee ? makeBigNumber(asset.transfer_fee) : null,
-    transferFeePaymentToken: asset.transfer_fee_payment_token
-      ? tokenFromJSON(asset.transfer_fee_payment_token)
       : null,
   };
   // If orders were included, put them in sell/buy order groups
@@ -368,6 +370,7 @@ export const collectionFromJSON = (collection: any): OpenSeaCollection => {
     featured: collection.featured,
     featuredImageUrl: collection.featured_image_url,
     displayData: collection.display_data,
+    safelistRequestStatus: collection.safelist_request_status,
     paymentTokens: (collection.payment_tokens || []).map(tokenFromJSON),
     openseaBuyerFeeBasisPoints: +collection.opensea_buyer_fee_basis_points,
     openseaSellerFeeBasisPoints: +collection.opensea_seller_fee_basis_points,
@@ -963,7 +966,83 @@ export function getOrderHash(order: UnhashedOrder) {
     feeMethod: order.feeMethod.toString(),
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return WyvernProtocol.getOrderHashHex(orderWithStringTypes as any);
+  return getOrderHashHex(orderWithStringTypes as any);
+}
+
+// sourced from: https://github.com/ProjectOpenSea/wyvern-js/blob/master/src/utils/utils.ts#L39
+function getOrderHashHex(order: UnhashedOrder): string {
+  const orderParts = [
+    { value: order.exchange, type: SolidityTypes.Address },
+    { value: order.maker, type: SolidityTypes.Address },
+    { value: order.taker, type: SolidityTypes.Address },
+    {
+      value: bigNumberToBN(order.makerRelayerFee),
+      type: SolidityTypes.Uint256,
+    },
+    {
+      value: bigNumberToBN(order.takerRelayerFee),
+      type: SolidityTypes.Uint256,
+    },
+    {
+      value: bigNumberToBN(order.makerProtocolFee),
+      type: SolidityTypes.Uint256,
+    },
+    {
+      value: bigNumberToBN(order.takerProtocolFee),
+      type: SolidityTypes.Uint256,
+    },
+    { value: order.feeRecipient, type: SolidityTypes.Address },
+    { value: order.feeMethod, type: SolidityTypes.Uint8 },
+    { value: order.side, type: SolidityTypes.Uint8 },
+    { value: order.saleKind, type: SolidityTypes.Uint8 },
+    { value: order.target, type: SolidityTypes.Address },
+    { value: order.howToCall, type: SolidityTypes.Uint8 },
+    {
+      value: Buffer.from(order.calldata.slice(2), "hex"),
+      type: SolidityTypes.Bytes,
+    },
+    {
+      value: Buffer.from(order.replacementPattern.slice(2), "hex"),
+      type: SolidityTypes.Bytes,
+    },
+    { value: order.staticTarget, type: SolidityTypes.Address },
+    {
+      value: Buffer.from(order.staticExtradata.slice(2), "hex"),
+      type: SolidityTypes.Bytes,
+    },
+    { value: order.paymentToken, type: SolidityTypes.Address },
+    { value: bigNumberToBN(order.basePrice), type: SolidityTypes.Uint256 },
+    { value: bigNumberToBN(order.extra), type: SolidityTypes.Uint256 },
+    { value: bigNumberToBN(order.listingTime), type: SolidityTypes.Uint256 },
+    { value: bigNumberToBN(order.expirationTime), type: SolidityTypes.Uint256 },
+    { value: bigNumberToBN(order.salt), type: SolidityTypes.Uint256 },
+  ];
+  const types = _.map(orderParts, (o) => o.type);
+  const values = _.map(orderParts, (o) => o.value);
+  const hash = Buffer.from(ethABI.soliditySHA3(types, values));
+  return ethUtil.bufferToHex(hash);
+}
+
+function bigNumberToBN(value: BigNumber) {
+  return new BN(value.toString(), 10);
+}
+
+// Sourced from: https://github.com/ProjectOpenSea/wyvern-js/blob/master/src/wyvernProtocol.ts#L170
+export function toBaseUnitAmount(
+  amount: BigNumber,
+  decimals: number
+): BigNumber {
+  assert.isBigNumber("amount", amount);
+  assert.isNumber("decimals", decimals);
+  const unit = new BigNumber(10).pow(decimals);
+  const baseUnitAmount = amount.times(unit);
+  const hasDecimals = baseUnitAmount.decimalPlaces() !== 0;
+  if (hasDecimals) {
+    throw new Error(
+      `Invalid unit amount: ${amount.toString()} - Too many decimal places`
+    );
+  }
+  return baseUnitAmount;
 }
 
 /**
@@ -1135,4 +1214,16 @@ export const feesToBasisPoints = (
     (sum, basisPoints) => basisPoints + sum,
     0
   );
+};
+
+/**
+ * checks protocol address
+ * @param protocolAddress a protocol address
+ */
+export const isValidProtocol = (protocolAddress: string): boolean => {
+  const checkSumAddress = Web3.utils.toChecksumAddress(protocolAddress);
+  const validProtocolAddresses = [CROSS_CHAIN_SEAPORT_V1_5_ADDRESS].map(
+    (address) => Web3.utils.toChecksumAddress(address)
+  );
+  return validProtocolAddresses.includes(checkSumAddress);
 };
